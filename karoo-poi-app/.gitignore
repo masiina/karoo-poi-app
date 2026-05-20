@@ -1,0 +1,18 @@
+# Build outputs
+.gradle/
+build/
+app/build/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# IDE
+.idea/
+*.iml
+
+# OS files
+.DS_Store
+
+# Geofabrik PBF data (large, download separately)
+data/

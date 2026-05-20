@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Location pin body -->
+    <path
+        android:fillColor="#0097A7"
+        android:pathData="M54,24 C44.06,24 36,32.06 36,42 C36,56 54,78 54,78 C54,78 72,56 72,42 C72,32.06 63.94,24 54,24 Z" />
+
+    <!-- Pin inner circle -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,34 C49.58,34 46,37.58 46,42 C46,46.42 49.58,50 54,50 C58.42,50 62,46.42 62,42 C62,37.58 58.42,34 54,34 Z" />
+
+    <!-- Small POI dot inside pin -->
+    <path
+        android:fillColor="#4CAF50"
+        android:pathData="M54,38 C51.79,38 50,39.79 50,42 C50,44.21 51.79,46 54,46 C56.21,46 58,44.21 58,42 C58,39.79 56.21,38 54,38 Z" />
+
+    <!-- Wave/route line below pin -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#4CAF50"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:pathData="M30,86 Q38,80 46,86 Q54,92 62,86 Q70,80 78,86" />
+</vector>

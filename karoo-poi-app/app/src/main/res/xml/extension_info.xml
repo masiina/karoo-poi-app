@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ExtensionInfo
+    id="poi"
+    displayName="@string/extension_name"
+    icon="@drawable/ic_launcher_foreground"
+    scansDevices="false"
+    mapLayer="true">
+    <DataType
+        typeId="next_beaches"
+        description="@string/next_beaches_desc"
+        displayName="@string/next_beaches_name"
+        graphical="true"
+        icon="@drawable/ic_launcher_foreground" />
+    <DataType
+        typeId="next_stores"
+        description="@string/next_stores_desc"
+        displayName="@string/next_stores_name"
+        graphical="true"
+        icon="@drawable/ic_launcher_foreground" />
+</ExtensionInfo>

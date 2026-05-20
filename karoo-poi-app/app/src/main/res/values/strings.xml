@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">Karoo POI</string>
+    <string name="extension_name">Karoo POI</string>
+    <string name="next_beaches_name">Next Beaches</string>
+    <string name="next_beaches_desc">Shows upcoming swimming and beach POIs ahead on the route</string>
+    <string name="next_stores_name">Next Stores</string>
+    <string name="next_stores_desc">Shows upcoming supermarket and convenience store POIs ahead on the route</string>
+    <string name="category_supermarket">Supermarket</string>
+    <string name="category_convenience">Convenience Store</string>
+</resources>
