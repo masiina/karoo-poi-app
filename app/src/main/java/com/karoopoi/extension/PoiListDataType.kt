@@ -54,10 +54,10 @@ abstract class PoiListDataType(
                         placeholder.setViewVisibility(R.id.poi_distance, android.view.View.GONE)
                         views.addView(R.id.poi_list_container, placeholder)
                     }
-                    state == DisplayState.WAITING_GPS -> {
+                    state == DisplayState.LOADED -> {
                         val placeholder = RemoteViews(context.packageName, R.layout.remote_views_poi_row)
                         placeholder.setInt(R.id.poi_name, "setGravity", android.view.Gravity.CENTER)
-                        placeholder.setTextViewText(R.id.poi_name, "Waiting GPS...")
+                        placeholder.setTextViewText(R.id.poi_name, "GPS locating...")
                         placeholder.setViewVisibility(R.id.poi_distance, android.view.View.GONE)
                         views.addView(R.id.poi_list_container, placeholder)
                     }

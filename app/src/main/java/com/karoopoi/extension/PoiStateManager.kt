@@ -18,8 +18,8 @@ data class PoiDisplayItem(
 
 enum class DisplayState {
     NO_ROUTE,
-    WAITING_GPS,
-    ACTIVE
+    LOADED,    // Route loaded, POIs shown from route start (no GPS yet)
+    ACTIVE     // GPS locked, POIs relative to user position
 }
 
 object PoiStateManager {
@@ -118,9 +118,74 @@ object PoiStateManager {
 
     fun onRouteLoaded() {
         if (_displayState.value == DisplayState.NO_ROUTE) {
-            Log.d(TAG, "Route loaded, transitioning to WAITING_GPS")
+            Log.d(TAG, "Route loaded, transitioning to LOADED")
             stateGeneration++
-            _displayState.value = DisplayState.WAITING_GPS
+            _displayState.value = DisplayState.LOADED
+        }
+    }
+
+    /**
+     * Perform an initial POI query using the route start point.
+     * Called when a route is loaded, before GPS fix is available,
+     * so POIs appear on the map immediately.
+     */
+    suspend fun initialRouteQuery(
+        routeStart: LatLng,
+        routePolyline: String,
+        engine: PoiFilterEngine
+    ) {
+        Log.d(TAG, "initialRouteQuery: querying POIs from route start $routeStart")
+        val genAtEntry = stateGeneration
+        val swimmingEnabled = cachedSwimming
+        val beachEnabled = cachedBeach
+        val supermarketEnabled = cachedSupermarket
+        val convenienceEnabled = cachedConvenience
+        val threshold = cachedThreshold
+
+        val activeBeachCategories = buildSet {
+            if (swimmingEnabled) add(CATEGORY_SWIMMING)
+            if (beachEnabled) add(CATEGORY_BEACH)
+        }
+        val activeStoreCategories = buildSet {
+            if (supermarketEnabled) add(CATEGORY_SUPERMARKET)
+            if (convenienceEnabled) add(CATEGORY_CONVENIENCE)
+        }
+        val allCategories = activeBeachCategories + activeStoreCategories
+
+        if (allCategories.isEmpty()) {
+            _displayState.value = DisplayState.LOADED
+            _beachDisplayItems.value = emptyList()
+            _storeDisplayItems.value = emptyList()
+            _beachPois.value = emptyList()
+            _storePois.value = emptyList()
+            return
+        }
+
+        try {
+            val pois = engine.findNextPois(routeStart, routePolyline, allCategories, threshold)
+            if (stateGeneration != genAtEntry) {
+                Log.d(TAG, "Stale generation after initial query — discarding results")
+                return
+            }
+            Log.d(TAG, "Initial query found ${pois.size} POIs from route start")
+
+            val beachPois = pois.filter { it.category in BEACH_CATEGORIES }
+            val storePois = pois.filter { it.category in STORE_CATEGORIES }
+
+            _beachPois.value = beachPois
+            _storePois.value = storePois
+
+            // Display items use route start as reference point (indicated by "~" prefix)
+            _beachDisplayItems.value = beachPois.toDisplayItems(routeStart) { "🏖" }
+            _storeDisplayItems.value = storePois.toDisplayItems(routeStart) { "🏪" }
+
+            // Only transition to LOADED if we were still in NO_ROUTE/LOADED state
+            // (don't downgrade from ACTIVE back to LOADED)
+            if (_displayState.value != DisplayState.ACTIVE) {
+                _displayState.value = DisplayState.LOADED
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed initial POI query", e)
         }
     }
 
@@ -145,15 +210,12 @@ object PoiStateManager {
             return
         }
         if (!hasGpsFix) {
-            Log.d(TAG, "Route loaded but no GPS fix, showing waiting message")
-            _displayState.value = DisplayState.WAITING_GPS
-            _beachDisplayItems.value = emptyList()
-            _storeDisplayItems.value = emptyList()
-            _beachPois.value = emptyList()
-            _storePois.value = emptyList()
-            lastUpdateLocation = null
-            lastBeachPois = null
-            lastStorePois = null
+            // No GPS fix yet — keep showing POIs from initial route query (if any).
+            // Don't clear the display; just don't update with stale positioning.
+            Log.d(TAG, "Route loaded but no GPS fix, keeping current display")
+            if (_displayState.value == DisplayState.NO_ROUTE) {
+                _displayState.value = DisplayState.LOADED
+            }
             return
         }
 

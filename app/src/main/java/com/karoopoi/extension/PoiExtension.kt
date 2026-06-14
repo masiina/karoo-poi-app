@@ -5,6 +5,7 @@ import androidx.room.Room
 import com.karoopoi.data.PoiDatabase
 import com.karoopoi.engine.PoiFilterEngine
 import com.karoopoi.geo.LatLng
+import com.karoopoi.geo.PolylineDecoder
 import com.karoopoi.prefs.PoiPreferences
 import io.hammerhead.karooext.KarooSystemService
 import io.hammerhead.karooext.extension.KarooExtension
@@ -38,7 +39,7 @@ class PoiExtension : KarooExtension("poi", "1") {
     private val db by lazy {
         Room.databaseBuilder(applicationContext, PoiDatabase::class.java, "pois_data.db")
             .createFromAsset("pois.db")
-            .addMigrations(PoiDatabase.MIGRATION_1_2)
+            .fallbackToDestructiveMigration()
             .build()
     }
 
@@ -84,6 +85,15 @@ class PoiExtension : KarooExtension("poi", "1") {
                 if (polyline != null) {
                     routePolyline.value = polyline
                     PoiStateManager.onRouteLoaded()
+                    // Query POIs immediately from route start point,
+                    // so map symbols appear before GPS locks.
+                    val routePoints = PolylineDecoder.decode(polyline)
+                    if (routePoints.isNotEmpty()) {
+                        val routeStart = routePoints.first()
+                        scope.launch {
+                            PoiStateManager.initialRouteQuery(routeStart, polyline, engine)
+                        }
+                    }
                 }
             }
         )
@@ -93,12 +103,14 @@ class PoiExtension : KarooExtension("poi", "1") {
             onEvent = { loc ->
                 Log.d("PoiExtension", "OnLocationChanged: lat=${loc.lat}, lng=${loc.lng}")
                 hasGpsFix.value = true
+                val currentLocation = LatLng(loc.lat, loc.lng)
+                val currentPolyline = routePolyline.value
                 scope.launch {
                     PoiStateManager.update(
-                        location = LatLng(loc.lat, loc.lng),
-                        routePolyline = routePolyline.value,
+                        location = currentLocation,
+                        routePolyline = currentPolyline,
                         engine = engine,
-                        hasGpsFix = hasGpsFix.value
+                        hasGpsFix = true
                     )
                 }
             }
