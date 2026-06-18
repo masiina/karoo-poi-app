@@ -76,16 +76,42 @@ dependencies {
 tasks.register<Exec>("generatePoiDb") {
     group = "build"
     description = "Generate POI SQLite DB from OSM PBF"
-    val pbfFile = project.findProperty("poi.pbf")?.toString() ?: "data/region.osm.pbf"
+    val pbfPath = project.findProperty("poi.pbf")?.toString() ?: "data/region.osm.pbf"
+    val pbfFile = rootProject.file(pbfPath)
     val outputDb = layout.buildDirectory.file("generated/assets/pois.db").get().asFile
-    inputs.file(file(pbfFile))
+
+    // Register input only when the PBF exists so Gradle can skip when unchanged.
+    // When the PBF is absent, no input is registered and the task always runs,
+    // hitting the doFirst guard below which fails the build with a clear message.
+    if (pbfFile.exists()) {
+        inputs.file(pbfFile)
+    }
     outputs.file(outputDb)
-    doFirst { outputDb.parentFile.mkdirs() }
-    commandLine("python3", rootProject.file("build_scripts/poi_pipeline.py").absolutePath, "--pbf", file(pbfFile).absolutePath, "--output", outputDb.absolutePath)
-    onlyIf { file(pbfFile).exists() }
+
+    doFirst {
+        outputDb.parentFile.mkdirs()
+        if (!pbfFile.exists()) {
+            throw GradleException(
+                "POI database source PBF not found at: ${pbfFile.absolutePath}\n" +
+                "The POI database is generated at build time from an OSM PBF extract.\n" +
+                "Download a region from Geofabrik, e.g.:\n" +
+                "  mkdir -p data && wget https://download.geofabrik.de/europe/finland-latest.osm.pbf -O data/region.osm.pbf\n" +
+                "Or specify a custom path: ./gradlew app:assembleDebug -Ppoi.pbf=/path/to/region.osm.pbf"
+            )
+        }
+    }
+    commandLine("python3", rootProject.file("build_scripts/poi_pipeline.py").absolutePath, "--pbf", pbfFile.absolutePath, "--output", outputDb.absolutePath)
 }
 
 afterEvaluate {
-    tasks.named("mergeReleaseAssets") { dependsOn("generatePoiDb") }
-    tasks.named("mergeDebugAssets") { dependsOn("generatePoiDb") }
+    // generatePoiDb produces the only pois.db asset, so every task that
+    // consumes assets (merge, lint-vital) must depend on it.
+    listOf(
+        "mergeReleaseAssets",
+        "mergeDebugAssets",
+        "lintVitalAnalyzeRelease",
+        "generateReleaseLintVitalReportModel",
+    ).forEach { taskName ->
+        tasks.findByName(taskName)?.dependsOn("generatePoiDb")
+    }
 }

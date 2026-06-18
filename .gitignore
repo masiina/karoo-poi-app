@@ -16,3 +16,6 @@ __pycache__/
 
 # Geofabrik PBF data (large, download separately)
 /data/
+
+# POI database is generated at build time from OSM PBF (see generatePoiDb task)
+app/src/main/assets/pois.db

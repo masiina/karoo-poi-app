@@ -10,7 +10,7 @@ POI finder for the Hammerhead Karoo bike computer. Shows upcoming supermarkets, 
 - **App icon** — teal location pin with green wave adaptive icon
 - **Configurable threshold** — set max distance from route (0–5000 m) in the Settings activity
 - **Category toggles** — enable/disable swimming, beach, supermarket, and convenience store POIs independently
-- **Finland POI database** — ships with 12,749 POIs: 6,541 beaches, 2,198 swimming, 1,828 supermarkets, 2,182 convenience stores (~4 MB SQLite)
+- **Finland POI database** — generated from OSM data at build time: 12,749 POIs (6,541 beaches, 2,198 swimming, 1,828 supermarkets, 2,182 convenience stores, ~4 MB SQLite)
 
 ## How it works
 
@@ -35,7 +35,7 @@ POI finder for the Hammerhead Karoo bike computer. Shows upcoming supermarkets, 
 │  data/         Room DB (PoiEntity, PoiDao)   │
 │  prefs/        DataStore preferences         │
 ├─────────────────────────────────────────────┤
-│  assets/pois.db  Pre-built SQLite (12K POIs) │
+│  assets/         Empty — pois.db generated at build time │
 │  build_scripts/  Pipeline (PBF → SQLite)     │
 └─────────────────────────────────────────────┘
 ```
@@ -58,16 +58,25 @@ POI finder for the Hammerhead Karoo bike computer. Shows upcoming supermarkets, 
 
 ## Building
 
+The POI database is generated at build time from an OSM PBF extract — it is
+not checked into git. You must download a PBF before the first build.
+
 ```bash
 # Generate Gradle wrapper
 gradle wrapper
 
-# Build debug APK
+# Download a region extract (required for first build)
+mkdir -p data
+wget https://download.geofabrik.de/europe/finland-latest.osm.pbf -O data/region.osm.pbf
+
+# Build debug APK (generatePoiDb runs automatically)
 ./gradlew app:assembleDebug
 
 # Install on connected Karoo
 adb install app/build/outputs/apk/debug/app-debug.apk
 ```
+
+If no PBF is found, the build fails with instructions on how to download one.
 
 ## Generating POI database for a different region
 
@@ -76,11 +85,8 @@ adb install app/build/outputs/apk/debug/app-debug.apk
 mkdir -p data
 wget https://download.geofabrik.de/europe/finland-latest.osm.pbf -O data/finland-latest.osm.pbf
 
-# Run pipeline
-python3 build_scripts/poi_pipeline.py --pbf data/finland-latest.osm.pbf --output app/src/main/assets/pois.db
-
-# Rebuild
-./gradlew app:assembleDebug
+# Build with custom PBF path (pipeline runs automatically during build)
+./gradlew app:assembleDebug -Ppoi.pbf=data/finland-latest.osm.pbf
 ```
 
 The `data/` directory is gitignored — PBF files are large and should be
@@ -97,7 +103,7 @@ karoo-poi/
 │   ├── src/
 │   │   ├── main/
 │   │   │   ├── AndroidManifest.xml
-│   │   │   ├── assets/pois.db    # Pre-built POI SQLite database
+│   │   │   ├── assets/           # pois.db generated at build time
 │   │   │   ├── java/com/karoopoi/
 │   │   │   │   ├── data/         # PoiEntity, PoiDao, PoiDatabase
 │   │   │   │   ├── engine/       # PoiFilterEngine, PoiResult

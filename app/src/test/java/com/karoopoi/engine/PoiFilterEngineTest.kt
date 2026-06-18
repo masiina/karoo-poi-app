@@ -35,9 +35,11 @@ class PoiFilterEngineTest {
     fun `findNextPois returns sorted by distance along route`() = runBlocking {
         val route = PolylineEncoder.encode(listOf(LatLng(0.0, 0.0), LatLng(0.1, 0.0)))
         db.poiDao().insertAll(
-            PoiEntity(id = 1, osmId = "1", name = "Far", lat = 0.05, lon = 0.0005, category = "beach", tags = null),
-            PoiEntity(id = 2, osmId = "2", name = "Near", lat = 0.01, lon = 0.0005, category = "swimming", tags = null),
-            PoiEntity(id = 3, osmId = "3", name = "Off", lat = 0.02, lon = 0.01, category = "beach", tags = null)
+            listOf(
+                PoiEntity(id = 1, osmId = "1", name = "Far", lat = 0.05, lon = 0.0005, category = "beach", tags = null),
+                PoiEntity(id = 2, osmId = "2", name = "Near", lat = 0.01, lon = 0.0005, category = "swimming", tags = null),
+                PoiEntity(id = 3, osmId = "3", name = "Off", lat = 0.02, lon = 0.01, category = "beach", tags = null)
+            )
         )
         val result = engine.findNextPois(
             currentLocation = LatLng(0.0, 0.0),
