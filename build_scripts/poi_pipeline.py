@@ -119,6 +119,8 @@ def deduplicate_pois(conn: sqlite3.Connection) -> int:
     if removed:
         print(f"Deduplication: removed {removed} duplicate POIs "
               f"({before} -> {after})")
+        # VACUUM cannot run inside a transaction; commit the DELETE first.
+        conn.commit()
         conn.execute("VACUUM")
     return removed
 
