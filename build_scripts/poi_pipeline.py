@@ -76,6 +76,53 @@ def _is_excluded_swimming(props: dict) -> bool:
     return False
 
 
+# Distance threshold for deduplication: POIs with the same name and category
+# within this distance are considered duplicates. ~50m accounts for the
+# difference between a node marker and a polygon centroid.
+DEDUP_LAT_THRESHOLD = 0.0005  # ~55m
+DEDUP_LON_THRESHOLD = 0.0015  # ~50m at 70°N, ~83m at 60°N
+
+
+def deduplicate_pois(conn: sqlite3.Connection) -> int:
+    """Remove duplicate POIs with the same name and category within ~50m.
+
+    Handles the common OSM pattern where a feature is mapped as both a node
+    (point) and a way (polygon), producing two POIs at nearly the same
+    location after centroid computation. Also catches duplicate nodes and
+    multi-tagged ways (e.g. a beach tagged as both leisure=swimming_area
+    and natural=beach).
+
+    Keeps the entry with the richest OSM tags (longest tags JSON), using
+    rowid as a tiebreaker. Returns the number of duplicates removed.
+    """
+    before = conn.execute("SELECT COUNT(*) FROM pois").fetchone()[0]
+
+    conn.execute(
+        "DELETE FROM pois WHERE rowid IN ("
+        "  SELECT b.rowid"
+        "  FROM pois a"
+        "  JOIN pois b ON a.name = b.name"
+        "             AND a.category = b.category"
+        "             AND a.rowid != b.rowid"
+        "             AND ABS(a.lat - b.lat) < ?"
+        "             AND ABS(a.lon - b.lon) < ?"
+        "  WHERE a.name IS NOT NULL"
+        "    AND (COALESCE(length(a.tags), 0) > COALESCE(length(b.tags), 0)"
+        "         OR (COALESCE(length(a.tags), 0) = COALESCE(length(b.tags), 0)"
+        "             AND a.rowid < b.rowid))"
+        ")",
+        (DEDUP_LAT_THRESHOLD, DEDUP_LON_THRESHOLD),
+    )
+
+    after = conn.execute("SELECT COUNT(*) FROM pois").fetchone()[0]
+    removed = before - after
+    if removed:
+        print(f"Deduplication: removed {removed} duplicate POIs "
+              f"({before} -> {after})")
+        conn.execute("VACUUM")
+    return removed
+
+
 def run_export(pbf_path: str, geojson_path: str) -> None:
     """Filter PBF by swimming tags and export to GeoJSONSeq."""
     with tempfile.NamedTemporaryFile(suffix=".pbf", delete=False) as filtered_pbf:
@@ -180,6 +227,8 @@ def parse_and_write(geojson_path: str, db_path: str) -> None:
                             (osm_id, name, lat, lon, category, tags_json),
                         )
                         break
+
+        deduplicate_pois(conn)
 
 
 def main() -> None:

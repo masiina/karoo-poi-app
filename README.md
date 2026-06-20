@@ -10,7 +10,7 @@ POI finder for the Hammerhead Karoo bike computer. Shows upcoming supermarkets, 
 - **App icon** — teal location pin with green wave adaptive icon
 - **Configurable threshold** — set max distance from route (0–5000 m) in the Settings activity
 - **Category toggles** — enable/disable swimming, beach, supermarket, and convenience store POIs independently
-- **Finland POI database** — generated from OSM data at build time: 12,749 POIs (6,541 beaches, 2,198 swimming, 1,828 supermarkets, 2,182 convenience stores, ~4 MB SQLite)
+- **Finland POI database** — generated from OSM data at build time: 10,353 POIs (5,912 beaches, 1,498 swimming, 1,220 supermarkets, 1,723 convenience stores, ~3.2 MB SQLite). Build pipeline automatically deduplicates OSM features mapped as both nodes and ways
 
 ## How it works
 
@@ -32,7 +32,8 @@ POI finder for the Hammerhead Karoo bike computer. Shows upcoming supermarkets, 
 │                PoiStateManager, DisplayState  │
 │  engine/       PoiFilterEngine, PoiResult    │
 │  geo/          GeoUtils, PolylineDecoder     │
-│  data/         Room DB (PoiEntity, PoiDao)   │
+│  data/         Room DB (PoiEntity, PoiDao,   │
+│                PoiCandidate)                 │
 │  prefs/        DataStore preferences         │
 ├─────────────────────────────────────────────┤
 │  assets/         Empty — pois.db generated at build time │
@@ -91,7 +92,9 @@ wget https://download.geofabrik.de/europe/finland-latest.osm.pbf -O data/finland
 
 The `data/` directory is gitignored — PBF files are large and should be
 downloaded separately. Indoor swimming halls and private facilities are
-automatically filtered out by the pipeline. To change POI categories or
+automatically filtered out by the pipeline. The pipeline also deduplicates
+POIs mapped as both nodes and ways (same name and category within ~50 m),
+keeping the entry with the richest OSM tags. To change POI categories or
 filtering rules, edit `build_scripts/poi_pipeline.py`.
 
 ## Project structure
@@ -105,7 +108,7 @@ karoo-poi/
 │   │   │   ├── AndroidManifest.xml
 │   │   │   ├── assets/           # pois.db generated at build time
 │   │   │   ├── java/com/karoopoi/
-│   │   │   │   ├── data/         # PoiEntity, PoiDao, PoiDatabase
+│   │   │   │   ├── data/         # PoiEntity, PoiCandidate, PoiDao, PoiDatabase
 │   │   │   │   ├── engine/       # PoiFilterEngine, PoiResult
 │   │   │   │   ├── extension/    # PoiExtension, PoiListDataType,
 │   │   │   │   │                   BeachDataType, StoreDataType,
