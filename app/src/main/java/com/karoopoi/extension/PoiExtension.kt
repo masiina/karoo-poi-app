@@ -36,6 +36,8 @@ class PoiExtension : KarooExtension("poi", "1") {
     private val previousSymbolIds = MutableStateFlow<List<String>>(emptyList())
     private val symbolCounter = AtomicInteger(0)
     private lateinit var karooSystem: KarooSystemService
+    @Volatile
+    private var consumersRegistered = false
     private val db by lazy {
         Room.databaseBuilder(applicationContext, PoiDatabase::class.java, "pois_data.db")
             .createFromAsset("pois.db")
@@ -52,13 +54,20 @@ class PoiExtension : KarooExtension("poi", "1") {
 
         karooSystem.connect { connected ->
             Log.d("PoiExtension", "karooSystem.connect callback: connected=$connected")
+            if (connected && !consumersRegistered) {
+                consumersRegistered = true
+                registerConsumers(engine)
+            }
         }
 
         // Start caching preferences reactively — avoids disk read on every GPS tick
         scope.launch {
             PoiStateManager.observePreferences(preferences)
         }
+    }
 
+    private fun registerConsumers(engine: PoiFilterEngine) {
+        Log.d("PoiExtension", "Registering Karoo system consumers")
         karooSystem.addConsumer<OnNavigationState>(
             OnNavigationState.Params,
             onError = { err -> Log.e("PoiExtension", "Navigation consumer error: $err") },

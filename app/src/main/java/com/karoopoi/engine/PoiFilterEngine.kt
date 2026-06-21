@@ -193,6 +193,26 @@ class PoiFilterEngine(private val poiDao: PoiDao) {
             )
         }
 
-        return results.sortedBy { it.distanceAlongRoute }.take(limit)
+        val sorted = results.sortedBy { it.distanceAlongRoute }
+
+        // Dedup by proximity: remove POIs within 50m of an already-kept POI.
+        // Same physical place may appear under different categories
+        // (e.g. leisure=swimming_area + natural=beach), so don't require
+        // category match. Prefer named POIs over unnamed ones.
+        val dedupThreshold = 50.0 // meters
+        val deduped = mutableListOf<PoiResult>()
+        for (poi in sorted) {
+            val matchIdx = deduped.indexOfFirst { kept ->
+                GeoUtils.distance(LatLng(kept.lat, kept.lon), LatLng(poi.lat, poi.lon)) < dedupThreshold
+            }
+            if (matchIdx == -1) {
+                deduped.add(poi)
+            } else if (poi.name != null && deduped[matchIdx].name == null) {
+                // Replace unnamed with named POI at same location
+                deduped[matchIdx] = poi
+            }
+        }
+
+        return deduped.take(limit)
     }
 }

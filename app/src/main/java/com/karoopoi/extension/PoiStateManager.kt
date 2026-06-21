@@ -36,6 +36,11 @@ object PoiStateManager {
     // At 30 km/h (~8 m/s), 30m ≈ 3.5s — display distances still update each tick.
     private const val MIN_UPDATE_METERS = 30.0
 
+    // Hysteresis for detecting passed POIs: a POI is considered "passed" when
+    // the straight-line GPS distance to it increases by more than this amount.
+    // Prevents false positives from GPS jitter (typically 3-5m).
+    private const val PASSED_HYSTERESIS_METERS = 5.0
+
     private val _displayState = MutableStateFlow(DisplayState.NO_ROUTE)
     val displayState: StateFlow<DisplayState> = _displayState.asStateFlow()
 
@@ -68,6 +73,10 @@ object PoiStateManager {
     @Volatile
     private var lastStorePois: List<PoiResult>? = null
 
+    // Tracks previous GPS distance per POI to detect when the user has passed.
+    // Keyed by osmId. Updated every tick in toDisplayItems().
+    private val previousGpsDistances = mutableMapOf<String, Double>()
+
     // Cached preferences — updated reactively, avoiding .first() disk read per tick
     @Volatile
     private var cachedSwimming: Boolean = true
@@ -90,17 +99,27 @@ object PoiStateManager {
         }
     }
 
-    private suspend fun List<PoiResult>.toDisplayItems(location: LatLng, iconForCategory: (String) -> String): List<PoiDisplayItem> {
-        return distinctBy { it.name ?: it.category }.take(5).map {
-            val icon = iconForCategory(it.category)
-            val gpsDist = GeoUtils.distance(location, LatLng(it.lat, it.lon))
-            val dist = if (gpsDist >= 1000) {
-                "${(gpsDist / 1000).toInt()}km"
-            } else {
-                "${gpsDist.toInt()}m"
+    private fun List<PoiResult>.toDisplayItems(location: LatLng, iconForCategory: (String) -> String): List<PoiDisplayItem> {
+        return this
+            .filter { poi ->
+                val gpsDist = GeoUtils.distance(location, LatLng(poi.lat, poi.lon))
+                val prevDist = previousGpsDistances[poi.osmId]
+                previousGpsDistances[poi.osmId] = gpsDist
+                // Exclude POIs the user has passed (GPS distance increasing)
+                prevDist == null || gpsDist <= prevDist + PASSED_HYSTERESIS_METERS
             }
-            PoiDisplayItem(icon, it.name ?: it.category, dist)
-        }
+            .distinctBy { it.name ?: it.category }
+            .take(5)
+            .map { poi ->
+                val icon = iconForCategory(poi.category)
+                val gpsDist = GeoUtils.distance(location, LatLng(poi.lat, poi.lon))
+                val dist = if (gpsDist >= 1000) {
+                    "${(gpsDist / 1000).toInt()}km"
+                } else {
+                    "${gpsDist.toInt()}m"
+                }
+                PoiDisplayItem(icon, poi.name ?: poi.category, dist)
+            }
     }
 
     fun clearState() {
@@ -114,6 +133,7 @@ object PoiStateManager {
         lastUpdateLocation = null
         lastBeachPois = null
         lastStorePois = null
+        previousGpsDistances.clear()
     }
 
     fun onRouteLoaded() {
@@ -136,6 +156,7 @@ object PoiStateManager {
     ) {
         Log.d(TAG, "initialRouteQuery: querying POIs from route start $routeStart")
         val genAtEntry = stateGeneration
+        previousGpsDistances.clear()
         val swimmingEnabled = cachedSwimming
         val beachEnabled = cachedBeach
         val supermarketEnabled = cachedSupermarket
@@ -175,6 +196,14 @@ object PoiStateManager {
             _beachPois.value = beachPois
             _storePois.value = storePois
 
+            // Cache for spatial tolerance — so update() can skip re-querying
+            // if user barely moved from route start
+            lastUpdateLocation = routeStart
+            lastCategories = allCategories
+            lastThreshold = threshold
+            lastBeachPois = beachPois
+            lastStorePois = storePois
+
             // Display items use route start as reference point (indicated by "~" prefix)
             _beachDisplayItems.value = beachPois.toDisplayItems(routeStart) { "🏖" }
             _storeDisplayItems.value = storePois.toDisplayItems(routeStart) { "🏪" }
@@ -207,6 +236,7 @@ object PoiStateManager {
             lastUpdateLocation = null
             lastBeachPois = null
             lastStorePois = null
+            previousGpsDistances.clear()
             return
         }
         if (!hasGpsFix) {
@@ -246,6 +276,7 @@ object PoiStateManager {
             lastUpdateLocation = null
             lastBeachPois = null
             lastStorePois = null
+            previousGpsDistances.clear()
             return
         }
         Log.d(TAG, "Threshold: ${threshold}m")
@@ -255,9 +286,14 @@ object PoiStateManager {
         if (sameCats && lastUpdateLocation != null && lastBeachPois != null && lastStorePois != null) {
             val moved = GeoUtils.distance(location, lastUpdateLocation!!)
             if (moved < MIN_UPDATE_METERS) {
-                // Still update display distances (they change with every GPS tick)
-                _beachDisplayItems.value = lastBeachPois!!.toDisplayItems(location) { "\uD83C\uDFD6" }
-                _storeDisplayItems.value = lastStorePois!!.toDisplayItems(location) { "\uD83C\uDFEA" }
+                // GPS locked — update display distances and ensure we're ACTIVE.
+                // Pre-lock GPS locations are unreliable and could be far from
+                // the route start, causing all POIs to be filtered as "passed".
+                if (hasGpsFix) {
+                    _beachDisplayItems.value = lastBeachPois!!.toDisplayItems(location) { "\uD83C\uDFD6" }
+                    _storeDisplayItems.value = lastStorePois!!.toDisplayItems(location) { "\uD83C\uDFEA" }
+                    _displayState.value = DisplayState.ACTIVE
+                }
                 return  // Skip DB query + projection pipeline
             }
         }
@@ -270,6 +306,15 @@ object PoiStateManager {
                 return
             }
             Log.d(TAG, "Found ${pois.size} POIs")
+
+            if (pois.isEmpty()) {
+                // GPS returned a bad/cached location before lock — findNextPois
+                // found nothing ahead. Keep current display items untouched
+                // (from initialRouteQuery or last good update) so the list
+                // doesn't go blank.
+                Log.d(TAG, "No POIs found — keeping current display (likely pre-lock GPS)")
+                return
+            }
 
             val beachPois = pois.filter { it.category in BEACH_CATEGORIES }
             val storePois = pois.filter { it.category in STORE_CATEGORIES }
@@ -296,6 +341,7 @@ object PoiStateManager {
             lastUpdateLocation = null
             lastBeachPois = null
             lastStorePois = null
+            previousGpsDistances.clear()
         }
     }
 }

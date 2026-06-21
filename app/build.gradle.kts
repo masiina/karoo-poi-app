@@ -53,6 +53,16 @@ android {
     sourceSets["main"].assets.srcDir(layout.buildDirectory.dir("generated/assets"))
 }
 
+// Rename output APKs to include app name, version, and build type.
+// e.g. karoo-poi-1.1-debug.apk instead of app-debug.apk
+android.applicationVariants.configureEach {
+    val variantName = name
+    outputs.configureEach {
+        val output = this as com.android.build.gradle.internal.api.ApkVariantOutputImpl
+        output.outputFileName = "karoo-poi-${android.defaultConfig.versionName}-$variantName.apk"
+    }
+}
+
 dependencies {
     implementation("io.hammerhead:karoo-ext:1.1.8")
     implementation("androidx.core:core-ktx:1.12.0")
