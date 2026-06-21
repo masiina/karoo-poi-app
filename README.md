@@ -1,21 +1,21 @@
 # Karoo POI
 
-POI finder for the Hammerhead Karoo bike computer. Shows upcoming supermarkets, convenience stores, swimming areas, and beaches along your route in custom data fields, with map markers for tap-to-navigate.
+POI finder for the Hammerhead Karoo bike computer. Shows upcoming supermarkets, convenience stores, swimming areas, beaches, and scenic viewpoints along your route in custom data fields, with map markers for tap-to-navigate.
 
 ## Features
 
 - **Three custom data fields** — "Next Beaches" shows swimming/beach POIs, "Next Stores" shows supermarket/convenience store POIs, "Next Viewpoints" shows scenic viewpoint POIs; each lists the 5 nearest ahead on your route with GPS distance and category icons
 - **Map markers** — all route POIs appear as icons on the Karoo map; tap any marker to navigate to it
-- **Contextual status messages** — custom fields show "No route loaded" when idle, "Waiting GPS..." when route loaded without GPS lock, then POI items once both are available
+- **Contextual status messages** — custom fields show "No route loaded" when idle, "GPS locating..." when route loaded without GPS lock, then POI items once both are available
 - **App icon** — teal location pin with green wave adaptive icon
 - **Configurable threshold** — set max distance from route (0–5000 m) in the Settings activity
 - **Category toggles** — enable/disable beaches & swimming, stores, and viewpoint POIs independently
-- **Finland POI database** — generated from OSM data at build time: 10,353 POIs (5,912 beaches, 1,498 swimming, 1,220 supermarkets, 1,723 convenience stores, plus viewpoints, ~3.2 MB SQLite). Build pipeline automatically deduplicates OSM features mapped as both nodes and ways
+- **Finland POI database** — generated from OSM data at build time: 12,016 POIs (5,912 beaches, 1,498 swimming, 1,220 supermarkets, 1,723 convenience stores, 1,663 viewpoints, ~3.2 MB SQLite). Build pipeline automatically deduplicates OSM features mapped as both nodes and ways
 
 ## How it works
 
 1. Extension connects to Karoo System Service and listens for `OnNavigationState` (route polyline) and `OnLocationChanged` (GPS position)
-2. When navigation state changes, `PoiStateManager` transitions `DisplayState` (`NO_ROUTE` → `WAITING_GPS` → `ACTIVE`) and clears stale data on route removal
+2. When navigation state changes, `PoiStateManager` transitions `DisplayState` (`NO_ROUTE` → `LOADED` → `ACTIVE`) and clears stale data on route removal
 3. When location changes, `PoiFilterEngine` finds your position on the route, queries the pre-built SQLite database for POIs in a bounding box along the remaining route (50 km look-ahead window), filters by distance threshold, and sorts by distance along the route
 4. `BeachDataType` renders beach/swimming results, `StoreDataType` renders store results, and `ViewpointDataType` renders viewpoint results in separate RemoteViews custom fields via shared `PoiListDataType` base class
 5. `startMap` emitter sends `Symbol.POI` markers to the Karoo map for visual overlay and tap-to-navigate
@@ -75,7 +75,7 @@ wget https://download.geofabrik.de/europe/finland-latest.osm.pbf -O data/region.
 ./gradlew app:assembleDebug
 
 # Install on connected Karoo
-adb install app/build/outputs/apk/debug/app-debug.apk
+adb install app/build/outputs/apk/debug/karoo-poi-1.2-debug.apk
 ```
 
 If no PBF is found, the build fails with instructions on how to download one.
