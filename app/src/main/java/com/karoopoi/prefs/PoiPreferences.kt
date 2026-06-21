@@ -23,29 +23,25 @@ object PoiPreferences {
 class PoiPreferencesImpl private constructor(val dataStore: DataStore<Preferences>) {
     constructor(context: Context) : this(context.dataStore)
 
-    val categorySwimming: Flow<Boolean> = dataStore.data.map { it[SWIMMING] ?: true }
-    val categoryBeach: Flow<Boolean> = dataStore.data.map { it[BEACH] ?: true }
-    val categorySupermarket: Flow<Boolean> = dataStore.data.map { it[SUPERMARKET] ?: true }
-    val categoryConvenience: Flow<Boolean> = dataStore.data.map { it[CONVENIENCE] ?: true }
+    val categoryBeachesSwimming: Flow<Boolean> = dataStore.data.map { it[BEACHES_SWIMMING] ?: true }
+    val categoryStores: Flow<Boolean> = dataStore.data.map { it[STORES] ?: true }
+    val categoryViewpoint: Flow<Boolean> = dataStore.data.map { it[VIEWPOINT] ?: true }
     val thresholdMeters: Flow<Int> = dataStore.data.map { it[THRESHOLD] ?: 500 }
 
-    suspend fun setSwimming(value: Boolean) { dataStore.edit { it[SWIMMING] = value } }
-    suspend fun setBeach(value: Boolean) { dataStore.edit { it[BEACH] = value } }
-    suspend fun setSupermarket(value: Boolean) { dataStore.edit { it[SUPERMARKET] = value } }
-    suspend fun setConvenience(value: Boolean) { dataStore.edit { it[CONVENIENCE] = value } }
+    suspend fun setBeachesSwimming(value: Boolean) { dataStore.edit { it[BEACHES_SWIMMING] = value } }
+    suspend fun setStores(value: Boolean) { dataStore.edit { it[STORES] = value } }
+    suspend fun setViewpoint(value: Boolean) { dataStore.edit { it[VIEWPOINT] = value } }
     suspend fun setThreshold(value: Int) { dataStore.edit { it[THRESHOLD] = value } }
 
     companion object {
-        val SWIMMING_KEY = booleanPreferencesKey("category_swimming")
-        val BEACH_KEY = booleanPreferencesKey("category_beach")
-        val SUPERMARKET_KEY = booleanPreferencesKey("category_supermarket")
-        val CONVENIENCE_KEY = booleanPreferencesKey("category_convenience")
+        val BEACHES_SWIMMING_KEY = booleanPreferencesKey("category_beaches_swimming")
+        val STORES_KEY = booleanPreferencesKey("category_stores")
+        val VIEWPOINT_KEY = booleanPreferencesKey("category_viewpoint")
         val THRESHOLD_KEY = intPreferencesKey("threshold_meters")
 
-        private val SWIMMING = SWIMMING_KEY
-        private val BEACH = BEACH_KEY
-        private val SUPERMARKET = SUPERMARKET_KEY
-        private val CONVENIENCE = CONVENIENCE_KEY
+        private val BEACHES_SWIMMING = BEACHES_SWIMMING_KEY
+        private val STORES = STORES_KEY
+        private val VIEWPOINT = VIEWPOINT_KEY
         private val THRESHOLD = THRESHOLD_KEY
     }
 }

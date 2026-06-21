@@ -17,4 +17,10 @@
         displayName="@string/next_stores_name"
         graphical="true"
         icon="@drawable/ic_launcher_foreground" />
+    <DataType
+        typeId="next_viewpoints"
+        description="@string/next_viewpoints_desc"
+        displayName="@string/next_viewpoints_name"
+        graphical="true"
+        icon="@drawable/ic_launcher_foreground" />
 </ExtensionInfo>

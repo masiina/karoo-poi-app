@@ -17,6 +17,7 @@ OSM_EXTRACT_TAGS = [
     "natural=beach",
     "shop=supermarket",
     "shop=convenience",
+    "tourism=viewpoint",
 ]
 
 # Maps OSM tag patterns to POI categories. Only these tag patterns produce POIs.
@@ -27,6 +28,7 @@ CATEGORY_MAP = {
     "natural=beach": "beach",
     "shop=supermarket": "supermarket",
     "shop=convenience": "convenience",
+    "tourism=viewpoint": "viewpoint",
 }
 
 # Tags that indicate an indoor/private swimming facility — excluded from POIs.

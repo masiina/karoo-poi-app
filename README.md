@@ -4,20 +4,20 @@ POI finder for the Hammerhead Karoo bike computer. Shows upcoming supermarkets, 
 
 ## Features
 
-- **Two custom data fields** — "Next Beaches" shows swimming/beach POIs, "Next Stores" shows supermarket/convenience store POIs; each lists the 5 nearest ahead on your route with GPS distance and category icons
+- **Three custom data fields** — "Next Beaches" shows swimming/beach POIs, "Next Stores" shows supermarket/convenience store POIs, "Next Viewpoints" shows scenic viewpoint POIs; each lists the 5 nearest ahead on your route with GPS distance and category icons
 - **Map markers** — all route POIs appear as icons on the Karoo map; tap any marker to navigate to it
 - **Contextual status messages** — custom fields show "No route loaded" when idle, "Waiting GPS..." when route loaded without GPS lock, then POI items once both are available
 - **App icon** — teal location pin with green wave adaptive icon
 - **Configurable threshold** — set max distance from route (0–5000 m) in the Settings activity
-- **Category toggles** — enable/disable swimming, beach, supermarket, and convenience store POIs independently
-- **Finland POI database** — generated from OSM data at build time: 10,353 POIs (5,912 beaches, 1,498 swimming, 1,220 supermarkets, 1,723 convenience stores, ~3.2 MB SQLite). Build pipeline automatically deduplicates OSM features mapped as both nodes and ways
+- **Category toggles** — enable/disable beaches & swimming, stores, and viewpoint POIs independently
+- **Finland POI database** — generated from OSM data at build time: 10,353 POIs (5,912 beaches, 1,498 swimming, 1,220 supermarkets, 1,723 convenience stores, plus viewpoints, ~3.2 MB SQLite). Build pipeline automatically deduplicates OSM features mapped as both nodes and ways
 
 ## How it works
 
 1. Extension connects to Karoo System Service and listens for `OnNavigationState` (route polyline) and `OnLocationChanged` (GPS position)
 2. When navigation state changes, `PoiStateManager` transitions `DisplayState` (`NO_ROUTE` → `WAITING_GPS` → `ACTIVE`) and clears stale data on route removal
 3. When location changes, `PoiFilterEngine` finds your position on the route, queries the pre-built SQLite database for POIs in a bounding box along the remaining route (50 km look-ahead window), filters by distance threshold, and sorts by distance along the route
-4. `BeachDataType` renders beach/swimming results, `StoreDataType` renders store results in separate RemoteViews custom fields via shared `PoiListDataType` base class
+4. `BeachDataType` renders beach/swimming results, `StoreDataType` renders store results, and `ViewpointDataType` renders viewpoint results in separate RemoteViews custom fields via shared `PoiListDataType` base class
 5. `startMap` emitter sends `Symbol.POI` markers to the Karoo map for visual overlay and tap-to-navigate
 
 ## Architecture
@@ -29,6 +29,7 @@ POI finder for the Hammerhead Karoo bike computer. Shows upcoming supermarkets, 
 │  ui/           SettingsActivity, layouts     │
 │  extension/    PoiExtension, PoiListDataType,│
 │                BeachDataType, StoreDataType, │
+│                ViewpointDataType,            │
 │                PoiStateManager, DisplayState  │
 │  engine/       PoiFilterEngine, PoiResult    │
 │  geo/          GeoUtils, PolylineDecoder     │
@@ -112,7 +113,8 @@ karoo-poi/
 │   │   │   │   ├── engine/       # PoiFilterEngine, PoiResult
 │   │   │   │   ├── extension/    # PoiExtension, PoiListDataType,
 │   │   │   │   │                   BeachDataType, StoreDataType,
-│   │   │   │   │                   PoiStateManager, DisplayState
+│   │   │   │   │                   ViewpointDataType, PoiStateManager,
+│   │   │   │   │                   DisplayState
 │   │   │   │   ├── geo/          # LatLng, GeoUtils, PolylineDecoder
 │   │   │   │   ├── prefs/        # PoiPreferences
 │   │   │   │   └── ui/           # SettingsActivity
@@ -151,10 +153,9 @@ The SettingsActivity provides:
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| Swimming | On | Show swimming areas and pools |
-| Beach | On | Show beaches |
-| Supermarket | On | Show supermarkets |
-| Convenience Store | On | Show convenience stores |
+| Beaches & Swimming | On | Show swimming areas and beaches |
+| Stores | On | Show supermarkets and convenience stores |
+| Viewpoint | On | Show scenic viewpoints |
 | Max distance | 500 m | POIs further from route are filtered out |
 
 Settings persist across restarts via DataStore.

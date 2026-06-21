@@ -27,22 +27,22 @@ class SettingsActivityTest {
     val activityRule = ActivityScenarioRule(SettingsActivity::class.java)
 
     @Test
-    fun toggleSwimmingPersists() {
+    fun toggleBeachesSwimmingPersists() {
         // Determine initial state
         val initialChecked = try {
-            onView(withId(R.id.swim_switch)).check(matches(isChecked()))
+            onView(withId(R.id.beaches_swimming_switch)).check(matches(isChecked()))
             true
         } catch (_: AssertionError) {
             false
         }
 
-        onView(withId(R.id.swim_switch)).perform(click())
+        onView(withId(R.id.beaches_swimming_switch)).perform(click())
         activityRule.scenario.recreate()
 
         if (initialChecked) {
-            onView(withId(R.id.swim_switch)).check(matches(isNotChecked()))
+            onView(withId(R.id.beaches_swimming_switch)).check(matches(isNotChecked()))
         } else {
-            onView(withId(R.id.swim_switch)).check(matches(isChecked()))
+            onView(withId(R.id.beaches_swimming_switch)).check(matches(isChecked()))
         }
     }
 

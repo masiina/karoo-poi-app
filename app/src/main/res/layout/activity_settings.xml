@@ -13,28 +13,22 @@
         android:textSize="18sp" />
 
     <com.google.android.material.switchmaterial.SwitchMaterial
-        android:id="@+id/swim_switch"
+        android:id="@+id/beaches_swimming_switch"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Swimming" />
+        android:text="@string/category_beaches_swimming" />
 
     <com.google.android.material.switchmaterial.SwitchMaterial
-        android:id="@+id/beach_switch"
+        android:id="@+id/stores_switch"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Beach" />
+        android:text="@string/category_stores" />
 
     <com.google.android.material.switchmaterial.SwitchMaterial
-        android:id="@+id/supermarket_switch"
+        android:id="@+id/viewpoint_switch"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="@string/category_supermarket" />
-
-    <com.google.android.material.switchmaterial.SwitchMaterial
-        android:id="@+id/convenience_switch"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="@string/category_convenience" />
+        android:text="@string/category_viewpoint" />
 
     <TextView
         android:layout_width="wrap_content"

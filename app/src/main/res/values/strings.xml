@@ -5,6 +5,11 @@
     <string name="next_beaches_desc">Shows upcoming swimming and beach POIs ahead on the route</string>
     <string name="next_stores_name">Next Stores</string>
     <string name="next_stores_desc">Shows upcoming supermarket and convenience store POIs ahead on the route</string>
+    <string name="next_viewpoints_name">Next Viewpoints</string>
+    <string name="next_viewpoints_desc">Shows upcoming scenic viewpoint POIs ahead on the route</string>
     <string name="category_supermarket">Supermarket</string>
     <string name="category_convenience">Convenience Store</string>
+    <string name="category_beaches_swimming">Beaches &amp; Swimming</string>
+    <string name="category_stores">Stores</string>
+    <string name="category_viewpoint">Viewpoint</string>
 </resources>

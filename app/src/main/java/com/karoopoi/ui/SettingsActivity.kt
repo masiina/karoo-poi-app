@@ -21,24 +21,19 @@ class SettingsActivity : AppCompatActivity() {
         prefs = PoiPreferences.getInstance(this)
 
         bindSwitch(
-            switch = findViewById(R.id.swim_switch),
-            flow = prefs.categorySwimming,
-            setter = { prefs.setSwimming(it) }
+            switch = findViewById(R.id.beaches_swimming_switch),
+            flow = prefs.categoryBeachesSwimming,
+            setter = { prefs.setBeachesSwimming(it) }
         )
         bindSwitch(
-            switch = findViewById(R.id.beach_switch),
-            flow = prefs.categoryBeach,
-            setter = { prefs.setBeach(it) }
+            switch = findViewById(R.id.stores_switch),
+            flow = prefs.categoryStores,
+            setter = { prefs.setStores(it) }
         )
         bindSwitch(
-            switch = findViewById(R.id.supermarket_switch),
-            flow = prefs.categorySupermarket,
-            setter = { prefs.setSupermarket(it) }
-        )
-        bindSwitch(
-            switch = findViewById(R.id.convenience_switch),
-            flow = prefs.categoryConvenience,
-            setter = { prefs.setConvenience(it) }
+            switch = findViewById(R.id.viewpoint_switch),
+            flow = prefs.categoryViewpoint,
+            setter = { prefs.setViewpoint(it) }
         )
 
         val thresholdSlider = findViewById<Slider>(R.id.threshold_slider)

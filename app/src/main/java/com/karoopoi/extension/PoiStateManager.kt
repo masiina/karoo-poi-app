@@ -28,9 +28,11 @@ object PoiStateManager {
     private const val CATEGORY_BEACH = "beach"
     private const val CATEGORY_SUPERMARKET = "supermarket"
     private const val CATEGORY_CONVENIENCE = "convenience"
+    private const val CATEGORY_VIEWPOINT = "viewpoint"
 
     private val BEACH_CATEGORIES = setOf(CATEGORY_SWIMMING, CATEGORY_BEACH)
     private val STORE_CATEGORIES = setOf(CATEGORY_SUPERMARKET, CATEGORY_CONVENIENCE)
+    private val VIEWPOINT_CATEGORIES = setOf(CATEGORY_VIEWPOINT)
 
     // Minimum movement in meters before recomputing POIs.
     // At 30 km/h (~8 m/s), 30m ≈ 3.5s — display distances still update each tick.
@@ -56,6 +58,12 @@ object PoiStateManager {
     private val _storePois = MutableStateFlow<List<PoiResult>>(emptyList())
     val storePois: StateFlow<List<PoiResult>> = _storePois.asStateFlow()
 
+    private val _viewpointDisplayItems = MutableStateFlow<List<PoiDisplayItem>>(emptyList())
+    val viewpointDisplayItems: StateFlow<List<PoiDisplayItem>> = _viewpointDisplayItems.asStateFlow()
+
+    private val _viewpointPois = MutableStateFlow<List<PoiResult>>(emptyList())
+    val viewpointPois: StateFlow<List<PoiResult>> = _viewpointPois.asStateFlow()
+
     // Generation counter — bumped on clearState/onRouteLoaded to invalidate
     // in-flight update() calls that may re-populate stale data after clearing
     @Volatile
@@ -72,6 +80,8 @@ object PoiStateManager {
     private var lastBeachPois: List<PoiResult>? = null
     @Volatile
     private var lastStorePois: List<PoiResult>? = null
+    @Volatile
+    private var lastViewpointPois: List<PoiResult>? = null
 
     // Tracks previous GPS distance per POI to detect when the user has passed.
     // Keyed by osmId. Updated every tick in toDisplayItems().
@@ -79,22 +89,19 @@ object PoiStateManager {
 
     // Cached preferences — updated reactively, avoiding .first() disk read per tick
     @Volatile
-    private var cachedSwimming: Boolean = true
+    private var cachedBeachesSwimming: Boolean = true
     @Volatile
-    private var cachedBeach: Boolean = true
+    private var cachedStores: Boolean = true
     @Volatile
-    private var cachedSupermarket: Boolean = true
-    @Volatile
-    private var cachedConvenience: Boolean = true
+    private var cachedViewpoint: Boolean = true
     @Volatile
     private var cachedThreshold: Int = 500
 
     suspend fun observePreferences(preferences: PoiPreferencesImpl) {
         preferences.dataStore.data.collect { prefs ->
-            cachedSwimming = prefs[PoiPreferencesImpl.SWIMMING_KEY] ?: true
-            cachedBeach = prefs[PoiPreferencesImpl.BEACH_KEY] ?: true
-            cachedSupermarket = prefs[PoiPreferencesImpl.SUPERMARKET_KEY] ?: true
-            cachedConvenience = prefs[PoiPreferencesImpl.CONVENIENCE_KEY] ?: true
+            cachedBeachesSwimming = prefs[PoiPreferencesImpl.BEACHES_SWIMMING_KEY] ?: true
+            cachedStores = prefs[PoiPreferencesImpl.STORES_KEY] ?: true
+            cachedViewpoint = prefs[PoiPreferencesImpl.VIEWPOINT_KEY] ?: true
             cachedThreshold = prefs[PoiPreferencesImpl.THRESHOLD_KEY] ?: 500
         }
     }
@@ -128,11 +135,14 @@ object PoiStateManager {
         _displayState.value = DisplayState.NO_ROUTE
         _beachDisplayItems.value = emptyList()
         _storeDisplayItems.value = emptyList()
+        _viewpointDisplayItems.value = emptyList()
         _beachPois.value = emptyList()
         _storePois.value = emptyList()
+        _viewpointPois.value = emptyList()
         lastUpdateLocation = null
         lastBeachPois = null
         lastStorePois = null
+        lastViewpointPois = null
         previousGpsDistances.clear()
     }
 
@@ -157,28 +167,26 @@ object PoiStateManager {
         Log.d(TAG, "initialRouteQuery: querying POIs from route start $routeStart")
         val genAtEntry = stateGeneration
         previousGpsDistances.clear()
-        val swimmingEnabled = cachedSwimming
-        val beachEnabled = cachedBeach
-        val supermarketEnabled = cachedSupermarket
-        val convenienceEnabled = cachedConvenience
+        val beachesSwimmingEnabled = cachedBeachesSwimming
+        val storesEnabled = cachedStores
+        val viewpointEnabled = cachedViewpoint
         val threshold = cachedThreshold
 
-        val activeBeachCategories = buildSet {
-            if (swimmingEnabled) add(CATEGORY_SWIMMING)
-            if (beachEnabled) add(CATEGORY_BEACH)
+        val activeBeachCategories = if (beachesSwimmingEnabled) BEACH_CATEGORIES else emptySet()
+        val activeStoreCategories = if (storesEnabled) STORE_CATEGORIES else emptySet()
+        val activeViewpointCategories = buildSet {
+            if (viewpointEnabled) add(CATEGORY_VIEWPOINT)
         }
-        val activeStoreCategories = buildSet {
-            if (supermarketEnabled) add(CATEGORY_SUPERMARKET)
-            if (convenienceEnabled) add(CATEGORY_CONVENIENCE)
-        }
-        val allCategories = activeBeachCategories + activeStoreCategories
+        val allCategories = activeBeachCategories + activeStoreCategories + activeViewpointCategories
 
         if (allCategories.isEmpty()) {
             _displayState.value = DisplayState.LOADED
             _beachDisplayItems.value = emptyList()
             _storeDisplayItems.value = emptyList()
+            _viewpointDisplayItems.value = emptyList()
             _beachPois.value = emptyList()
             _storePois.value = emptyList()
+            _viewpointPois.value = emptyList()
             return
         }
 
@@ -192,9 +200,11 @@ object PoiStateManager {
 
             val beachPois = pois.filter { it.category in BEACH_CATEGORIES }
             val storePois = pois.filter { it.category in STORE_CATEGORIES }
+            val viewpointPois = pois.filter { it.category in VIEWPOINT_CATEGORIES }
 
             _beachPois.value = beachPois
             _storePois.value = storePois
+            _viewpointPois.value = viewpointPois
 
             // Cache for spatial tolerance — so update() can skip re-querying
             // if user barely moved from route start
@@ -203,10 +213,12 @@ object PoiStateManager {
             lastThreshold = threshold
             lastBeachPois = beachPois
             lastStorePois = storePois
+            lastViewpointPois = viewpointPois
 
             // Display items use route start as reference point (indicated by "~" prefix)
             _beachDisplayItems.value = beachPois.toDisplayItems(routeStart) { "🏖" }
             _storeDisplayItems.value = storePois.toDisplayItems(routeStart) { "🏪" }
+            _viewpointDisplayItems.value = viewpointPois.toDisplayItems(routeStart) { "⛰" }
 
             // Only transition to LOADED if we were still in NO_ROUTE/LOADED state
             // (don't downgrade from ACTIVE back to LOADED)
@@ -231,11 +243,14 @@ object PoiStateManager {
             _displayState.value = DisplayState.NO_ROUTE
             _beachDisplayItems.value = emptyList()
             _storeDisplayItems.value = emptyList()
+            _viewpointDisplayItems.value = emptyList()
             _beachPois.value = emptyList()
             _storePois.value = emptyList()
+            _viewpointPois.value = emptyList()
             lastUpdateLocation = null
             lastBeachPois = null
             lastStorePois = null
+            lastViewpointPois = null
             previousGpsDistances.clear()
             return
         }
@@ -250,32 +265,31 @@ object PoiStateManager {
         }
 
         // Read cached preferences — no disk I/O
-        val swimmingEnabled = cachedSwimming
-        val beachEnabled = cachedBeach
-        val supermarketEnabled = cachedSupermarket
-        val convenienceEnabled = cachedConvenience
+        val beachesSwimmingEnabled = cachedBeachesSwimming
+        val storesEnabled = cachedStores
+        val viewpointEnabled = cachedViewpoint
         val threshold = cachedThreshold
 
-        val activeBeachCategories = buildSet {
-            if (swimmingEnabled) add(CATEGORY_SWIMMING)
-            if (beachEnabled) add(CATEGORY_BEACH)
+        val activeBeachCategories = if (beachesSwimmingEnabled) BEACH_CATEGORIES else emptySet()
+        val activeStoreCategories = if (storesEnabled) STORE_CATEGORIES else emptySet()
+        val activeViewpointCategories = buildSet {
+            if (viewpointEnabled) add(CATEGORY_VIEWPOINT)
         }
-        val activeStoreCategories = buildSet {
-            if (supermarketEnabled) add(CATEGORY_SUPERMARKET)
-            if (convenienceEnabled) add(CATEGORY_CONVENIENCE)
-        }
-        val allCategories = activeBeachCategories + activeStoreCategories
+        val allCategories = activeBeachCategories + activeStoreCategories + activeViewpointCategories
         Log.d(TAG, "Active categories: $allCategories")
 
         if (allCategories.isEmpty()) {
             _displayState.value = DisplayState.ACTIVE
             _beachDisplayItems.value = emptyList()
             _storeDisplayItems.value = emptyList()
+            _viewpointDisplayItems.value = emptyList()
             _beachPois.value = emptyList()
             _storePois.value = emptyList()
+            _viewpointPois.value = emptyList()
             lastUpdateLocation = null
             lastBeachPois = null
             lastStorePois = null
+            lastViewpointPois = null
             previousGpsDistances.clear()
             return
         }
@@ -283,7 +297,7 @@ object PoiStateManager {
 
         // Spatial tolerance: skip full recomputation if user barely moved
         val sameCats = allCategories == lastCategories && threshold == lastThreshold
-        if (sameCats && lastUpdateLocation != null && lastBeachPois != null && lastStorePois != null) {
+        if (sameCats && lastUpdateLocation != null && lastBeachPois != null && lastStorePois != null && lastViewpointPois != null) {
             val moved = GeoUtils.distance(location, lastUpdateLocation!!)
             if (moved < MIN_UPDATE_METERS) {
                 // GPS locked — update display distances and ensure we're ACTIVE.
@@ -292,6 +306,7 @@ object PoiStateManager {
                 if (hasGpsFix) {
                     _beachDisplayItems.value = lastBeachPois!!.toDisplayItems(location) { "\uD83C\uDFD6" }
                     _storeDisplayItems.value = lastStorePois!!.toDisplayItems(location) { "\uD83C\uDFEA" }
+                    _viewpointDisplayItems.value = lastViewpointPois!!.toDisplayItems(location) { "\uD83C\uDFD4" }
                     _displayState.value = DisplayState.ACTIVE
                 }
                 return  // Skip DB query + projection pipeline
@@ -318,9 +333,11 @@ object PoiStateManager {
 
             val beachPois = pois.filter { it.category in BEACH_CATEGORIES }
             val storePois = pois.filter { it.category in STORE_CATEGORIES }
+            val viewpointPois = pois.filter { it.category in VIEWPOINT_CATEGORIES }
 
             _beachPois.value = beachPois
             _storePois.value = storePois
+            _viewpointPois.value = viewpointPois
 
             // Cache for spatial tolerance
             lastUpdateLocation = location
@@ -328,19 +345,24 @@ object PoiStateManager {
             lastThreshold = threshold
             lastBeachPois = beachPois
             lastStorePois = storePois
+            lastViewpointPois = viewpointPois
 
             _beachDisplayItems.value = beachPois.toDisplayItems(location) { "\uD83C\uDFD6" }
             _storeDisplayItems.value = storePois.toDisplayItems(location) { "\uD83C\uDFEA" }
+            _viewpointDisplayItems.value = viewpointPois.toDisplayItems(location) { "\uD83C\uDFD4" }
             _displayState.value = DisplayState.ACTIVE
         } catch (e: Exception) {
             Log.e(TAG, "Failed to update POIs", e)
             _beachDisplayItems.value = emptyList()
             _storeDisplayItems.value = emptyList()
+            _viewpointDisplayItems.value = emptyList()
             _beachPois.value = emptyList()
             _storePois.value = emptyList()
+            _viewpointPois.value = emptyList()
             lastUpdateLocation = null
             lastBeachPois = null
             lastStorePois = null
+            lastViewpointPois = null
             previousGpsDistances.clear()
         }
     }

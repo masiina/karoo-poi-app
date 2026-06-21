@@ -26,8 +26,8 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicInteger
 
-class PoiExtension : KarooExtension("poi", "1") {
-    override val types = listOf(BeachDataType(), StoreDataType())
+class PoiExtension : KarooExtension("poi", "2") {
+    override val types = listOf(BeachDataType(), StoreDataType(), ViewpointDataType())
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val routePolyline = MutableStateFlow<String?>(null)
@@ -135,9 +135,10 @@ class PoiExtension : KarooExtension("poi", "1") {
         symbolCounter.set(0)
 
         mapScope!!.launch {
-            PoiStateManager.beachPois.combine(PoiStateManager.storePois) { beach, store ->
-                beach + store
-            }.distinctUntilChanged().collect { pois ->
+            PoiStateManager.beachPois
+                .combine(PoiStateManager.storePois) { beach, store -> beach + store }
+                .combine(PoiStateManager.viewpointPois) { acc, viewpoint -> acc + viewpoint }
+                .distinctUntilChanged().collect { pois ->
                 if (previousSymbolIds.value.isNotEmpty()) {
                     emitter.onNext(HideSymbols(previousSymbolIds.value.toList()))
                     previousSymbolIds.value = emptyList()
@@ -149,6 +150,7 @@ class PoiExtension : KarooExtension("poi", "1") {
                     ids.add(id)
                     val poiType = when (poi.category) {
                         "supermarket", "convenience" -> Symbol.POI.Types.CONVENIENCE_STORE
+                        "viewpoint" -> Symbol.POI.Types.VIEWPOINT
                         else -> Symbol.POI.Types.SWIMMING
                     }
                     Symbol.POI(
