@@ -110,7 +110,6 @@ class PoiExtension : KarooExtension("poi", "2") {
             onError = { err -> Log.e("PoiExtension", "Location consumer error: $err") },
             onComplete = { Log.d("PoiExtension", "Location consumer completed") },
             onEvent = { loc ->
-                Log.d("PoiExtension", "OnLocationChanged: lat=${loc.lat}, lng=${loc.lng}")
                 hasGpsFix.value = true
                 val currentLocation = LatLng(loc.lat, loc.lng)
                 val currentPolyline = routePolyline.value

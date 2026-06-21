@@ -33,44 +33,40 @@ abstract class PoiListDataType(
         scope!!.launch {
             combine(displayState, displayItems) { state, items -> Pair(state, items) }
                 .collect { (state, items) ->
-                Log.d(logTag, "Updating view: state=$state, items=${items.size}")
-                val views = RemoteViews(context.packageName, R.layout.remote_views_poi_list)
-                views.removeAllViews(R.id.poi_list_container)
-                when {
-                    items.isNotEmpty() -> {
-                        for (item in items) {
-                            val row = RemoteViews(context.packageName, R.layout.remote_views_poi_row)
-                            row.setInt(R.id.poi_name, "setGravity", android.view.Gravity.START or android.view.Gravity.CENTER_VERTICAL)
-                            row.setViewVisibility(R.id.poi_distance, android.view.View.VISIBLE)
-                            row.setTextViewText(R.id.poi_name, "${item.icon} ${item.name}")
-                            row.setTextViewText(R.id.poi_distance, item.distance)
-                            views.addView(R.id.poi_list_container, row)
+                    Log.d(logTag, "Updating view: state=$state, items=${items.size}")
+                    val views = RemoteViews(context.packageName, R.layout.remote_views_poi_list)
+
+                    val rowIds = intArrayOf(R.id.poi_row_0, R.id.poi_row_1, R.id.poi_row_2, R.id.poi_row_3, R.id.poi_row_4)
+                    val nameIds = intArrayOf(R.id.poi_name_0, R.id.poi_name_1, R.id.poi_name_2, R.id.poi_name_3, R.id.poi_name_4)
+                    val distIds = intArrayOf(R.id.poi_distance_0, R.id.poi_distance_1, R.id.poi_distance_2, R.id.poi_distance_3, R.id.poi_distance_4)
+
+                    if (items.isNotEmpty()) {
+                        // Hide placeholder, show POI rows
+                        views.setViewVisibility(R.id.poi_placeholder, android.view.View.GONE)
+                        for (i in rowIds.indices) {
+                            if (i < items.size) {
+                                val item = items[i]
+                                views.setViewVisibility(rowIds[i], android.view.View.VISIBLE)
+                                views.setTextViewText(nameIds[i], "${item.icon} ${item.name}")
+                                views.setTextViewText(distIds[i], item.distance)
+                            } else {
+                                views.setViewVisibility(rowIds[i], android.view.View.GONE)
+                            }
                         }
+                    } else {
+                        // Hide all POI rows, show placeholder
+                        for (rowId in rowIds) {
+                            views.setViewVisibility(rowId, android.view.View.GONE)
+                        }
+                        views.setViewVisibility(R.id.poi_placeholder, android.view.View.VISIBLE)
+                        val message = when (state) {
+                            DisplayState.NO_ROUTE -> "No route loaded"
+                            else -> "--"
+                        }
+                        views.setTextViewText(R.id.poi_placeholder, message)
                     }
-                    state == DisplayState.NO_ROUTE -> {
-                        val placeholder = RemoteViews(context.packageName, R.layout.remote_views_poi_row)
-                        placeholder.setInt(R.id.poi_name, "setGravity", android.view.Gravity.CENTER)
-                        placeholder.setTextViewText(R.id.poi_name, "No route loaded")
-                        placeholder.setViewVisibility(R.id.poi_distance, android.view.View.GONE)
-                        views.addView(R.id.poi_list_container, placeholder)
-                    }
-                    state == DisplayState.LOADED -> {
-                        val placeholder = RemoteViews(context.packageName, R.layout.remote_views_poi_row)
-                        placeholder.setInt(R.id.poi_name, "setGravity", android.view.Gravity.CENTER)
-                        placeholder.setTextViewText(R.id.poi_name, "GPS locating...")
-                        placeholder.setViewVisibility(R.id.poi_distance, android.view.View.GONE)
-                        views.addView(R.id.poi_list_container, placeholder)
-                    }
-                    else -> {
-                        val placeholder = RemoteViews(context.packageName, R.layout.remote_views_poi_row)
-                        placeholder.setInt(R.id.poi_name, "setGravity", android.view.Gravity.CENTER)
-                        placeholder.setTextViewText(R.id.poi_name, "--")
-                        placeholder.setViewVisibility(R.id.poi_distance, android.view.View.GONE)
-                        views.addView(R.id.poi_list_container, placeholder)
-                    }
+                    emitter.updateView(views)
                 }
-                emitter.updateView(views)
-            }
         }
         emitter.setCancellable {
             Log.d(logTag, "stopView called")

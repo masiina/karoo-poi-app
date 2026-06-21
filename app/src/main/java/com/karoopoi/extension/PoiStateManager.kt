@@ -9,6 +9,7 @@ import com.karoopoi.prefs.PoiPreferencesImpl
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.sync.Mutex
 
 data class PoiDisplayItem(
     val icon: String,
@@ -96,6 +97,8 @@ object PoiStateManager {
     private var cachedViewpoint: Boolean = true
     @Volatile
     private var cachedThreshold: Int = 500
+
+    private val updateMutex = Mutex()
 
     suspend fun observePreferences(preferences: PoiPreferencesImpl) {
         preferences.dataStore.data.collect { prefs ->
@@ -236,33 +239,36 @@ object PoiStateManager {
         engine: PoiFilterEngine,
         hasGpsFix: Boolean = false
     ) {
-        val genAtEntry = stateGeneration
-        Log.d(TAG, "update called: location=$location, routePolyline=${routePolyline?.take(50)}, hasGpsFix=$hasGpsFix")
-        if (routePolyline.isNullOrEmpty()) {
-            Log.d(TAG, "No route polyline, clearing display")
-            _displayState.value = DisplayState.NO_ROUTE
-            _beachDisplayItems.value = emptyList()
-            _storeDisplayItems.value = emptyList()
-            _viewpointDisplayItems.value = emptyList()
-            _beachPois.value = emptyList()
-            _storePois.value = emptyList()
-            _viewpointPois.value = emptyList()
-            lastUpdateLocation = null
-            lastBeachPois = null
-            lastStorePois = null
-            lastViewpointPois = null
-            previousGpsDistances.clear()
-            return
+        if (!updateMutex.tryLock()) {
+            return  // An update is already in flight — drop this tick
         }
-        if (!hasGpsFix) {
-            // No GPS fix yet — keep showing POIs from initial route query (if any).
-            // Don't clear the display; just don't update with stale positioning.
-            Log.d(TAG, "Route loaded but no GPS fix, keeping current display")
-            if (_displayState.value == DisplayState.NO_ROUTE) {
-                _displayState.value = DisplayState.LOADED
+        try {
+            val genAtEntry = stateGeneration
+            if (routePolyline.isNullOrEmpty()) {
+                Log.d(TAG, "No route polyline, clearing display")
+                _displayState.value = DisplayState.NO_ROUTE
+                _beachDisplayItems.value = emptyList()
+                _storeDisplayItems.value = emptyList()
+                _viewpointDisplayItems.value = emptyList()
+                _beachPois.value = emptyList()
+                _storePois.value = emptyList()
+                _viewpointPois.value = emptyList()
+                lastUpdateLocation = null
+                lastBeachPois = null
+                lastStorePois = null
+                lastViewpointPois = null
+                previousGpsDistances.clear()
+                return
             }
-            return
-        }
+            if (!hasGpsFix) {
+                // No GPS fix yet — keep showing POIs from initial route query (if any).
+                // Don't clear the display; just don't update with stale positioning.
+                Log.d(TAG, "Route loaded but no GPS fix, keeping current display")
+                if (_displayState.value == DisplayState.NO_ROUTE) {
+                    _displayState.value = DisplayState.LOADED
+                }
+                return
+            }
 
         // Read cached preferences — no disk I/O
         val beachesSwimmingEnabled = cachedBeachesSwimming
@@ -276,7 +282,6 @@ object PoiStateManager {
             if (viewpointEnabled) add(CATEGORY_VIEWPOINT)
         }
         val allCategories = activeBeachCategories + activeStoreCategories + activeViewpointCategories
-        Log.d(TAG, "Active categories: $allCategories")
 
         if (allCategories.isEmpty()) {
             _displayState.value = DisplayState.ACTIVE
@@ -293,7 +298,6 @@ object PoiStateManager {
             previousGpsDistances.clear()
             return
         }
-        Log.d(TAG, "Threshold: ${threshold}m")
 
         // Spatial tolerance: skip full recomputation if user barely moved
         val sameCats = allCategories == lastCategories && threshold == lastThreshold
@@ -323,11 +327,17 @@ object PoiStateManager {
             Log.d(TAG, "Found ${pois.size} POIs")
 
             if (pois.isEmpty()) {
-                // GPS returned a bad/cached location before lock — findNextPois
-                // found nothing ahead. Keep current display items untouched
-                // (from initialRouteQuery or last good update) so the list
-                // doesn't go blank.
-                Log.d(TAG, "No POIs found — keeping current display (likely pre-lock GPS)")
+                // No POIs ahead — user passed them all (with a real GPS fix).
+                // Clear display items so stale passed POIs don't linger with frozen distances,
+                // but keep the POI flows intact so map markers stay visible.
+                Log.d(TAG, "No POIs found ahead — clearing display")
+                _beachDisplayItems.value = emptyList()
+                _storeDisplayItems.value = emptyList()
+                _viewpointDisplayItems.value = emptyList()
+                lastBeachPois = emptyList()
+                lastStorePois = emptyList()
+                lastViewpointPois = emptyList()
+                _displayState.value = DisplayState.ACTIVE
                 return
             }
 
@@ -365,5 +375,8 @@ object PoiStateManager {
             lastViewpointPois = null
             previousGpsDistances.clear()
         }
+    } finally {
+        updateMutex.unlock()
     }
+}
 }
