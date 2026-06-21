@@ -226,6 +226,18 @@ def parse_and_write(geojson_path: str, db_path: str) -> None:
                         # Filter out indoor/private swimming facilities
                         if category == "swimming" and _is_excluded_swimming(props):
                             continue
+                        # Skip unnamed stores — without a name the user can't tell
+                        # what shop it is (K-Market, Sale, R-Kioski, etc.)
+                        if category in ("supermarket", "convenience") and not name:
+                            continue
+                        # Default names for unnamed POIs where the category itself is descriptive
+                        if not name:
+                            if category == "beach":
+                                name = "Beach"
+                            elif category == "swimming":
+                                name = "Swimming"
+                            elif category == "viewpoint":
+                                name = "Viewpoint"
                         conn.execute(
                             "INSERT OR IGNORE INTO pois (id, osm_id, name, lat, lon, category, tags) VALUES (NULL, ?, ?, ?, ?, ?, ?)",
                             (osm_id, name, lat, lon, category, tags_json),

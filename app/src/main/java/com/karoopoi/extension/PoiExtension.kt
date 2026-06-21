@@ -26,7 +26,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicInteger
 
-class PoiExtension : KarooExtension("poi", "2") {
+class PoiExtension : KarooExtension("poi", "3") {
     override val types = listOf(BeachDataType(), StoreDataType(), ViewpointDataType())
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
